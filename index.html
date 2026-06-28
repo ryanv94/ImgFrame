@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en" id="htmlRoot">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImgFrame // Pro Photo Exif Studio</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><linearGradient id=%22g%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22><stop offset=%220%25%22 style=%22stop-color:%239f7971;stop-opacity:1%22 /><stop offset=%22100%25%22 style=%22stop-color:%23d4af37;stop-opacity:1%22 /></linearGradient><text y=%22.9em%22 font-size=%2290%22 font-family=%22serif%22 font-style=%22italic%22 font-weight=%22900%22 fill=%22url(%23g)%22>F</text></svg>">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:ital,wght@1,900&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = { 
+            darkMode: 'class', 
+            theme: { 
+                extend: { 
+                    fontFamily: { 
+                        sans: ['Outfit', 'sans-serif'], 
+                        serif: ['Playfair Display', 'serif'],
+                        mono: ['IBM Plex Mono', 'monospace']
+                    } 
+                } 
+            } 
+        }
+        function applyInitialTheme() {
+            const savedTheme = localStorage.getItem('splttr-theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        }
+        applyInitialTheme();
+    </script>
+    <style>
+        :root { --accent: #9f7971; --gold: #d4af37; }
+        body { letter-spacing: -0.01em; }
+        .logo-font { font-family: 'Playfair Display', serif; background: linear-gradient(to right, var(--accent), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .custom-shadow { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+        .hidden-tool { display: none !important; }
+        
+        /* Custom styled Range Input to match splttr */
+        input[type=range]::-webkit-slider-thumb { accent-color: #6366f1; }
+        
+        /* Custom details summary styling for logo management */
+        details.logos summary::-webkit-details-marker { display: none; }
+        details.logos summary { list-style: none; }
+    </style>
+</head>
+<body class="bg-[#FAF9F6] dark:bg-[#121212] text-slate-900 dark:text-slate-100 min-h-screen flex flex-col items-center py-8 px-4 transition-colors duration-500">
+
+    <div class="max-w-5xl w-full space-y-10">
+        <header class="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="text-left">
+                <h1 class="text-6xl font-black italic tracking-tighter logo-font py-2">ImgFrame.</h1>
+            </div>
+            <nav class="flex bg-white/50 dark:bg-white/5 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div class="px-6 py-2 rounded-xl text-[10px] font-black tracking-widest bg-[#262626] text-white dark:bg-[#FDF5E6] dark:text-[#262626] shadow-md uppercase">
+                    Exif Matte Studio
+                </div>
+            </nav>
+            <button onclick="toggleDarkMode()" class="p-3 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:rotate-12 transition-all">
+                <i id="themeIcon" data-lucide="moon" class="w-5 h-5 text-indigo-500"></i>
+            </button>
+        </header>
+
+        <section id="dropzoneCard" class="bg-white dark:bg-[#1e1e1e] p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 custom-shadow space-y-6">
+            <div class="space-y-2">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400">1. Original Image Selection</label>
+                <input type="file" id="imageInput" accept="image/*" onchange="handleFileChange(this)" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-slate-100 dark:file:bg-slate-800 file:text-slate-600 dark:file:text-slate-300 cursor-pointer" />
+                <p class="text-[11px] text-slate-400 font-medium pt-1">Drop or select a JPEG/PNG photo. Metadata and logo pulling operations happen completely inside your browser window.</p>
+            </div>
+            <div id="statusMessage" class="text-xs font-mono text-indigo-500 dark:text-indigo-400 min-h-[1rem]"></div>
+        </section>
+
+        <main id="workspaceArea" class="hidden-tool grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
+            <div class="lg:col-span-5 space-y-6">
+                <div class="bg-white dark:bg-[#1e1e1e] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+                    <h2 class="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800/60 pb-2">Camera Metadata</h2>
+                    
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400" for="fCamera">Camera Model</label>
+                        <input type="text" id="fCamera" oninput="updateField('camera', this.value)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent text-xs font-medium outline-none focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors" />
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400" for="fLens">Lens Specification</label>
+                        <input type="text" id="fLens" oninput="updateField('lens', this.value)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent text-xs font-medium outline-none focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors" />
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="space-y-1">
+                            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400" for="fShutter">Shutter</label>
+                            <input type="text" id="fShutter" oninput="updateField('shutter', this.value)" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent text-xs font-medium font-mono text-center outline-none focus:border-indigo-500 transition-colors" />
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400" for="fAperture">Aperture</label>
+                            <input type="text" id="fAperture" oninput="updateField('aperture', this.value)" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent text-xs font-medium font-mono text-center outline-none focus:border-indigo-500 transition-colors" />
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400" for="fIso">ISO</label>
+                            <input type="text" id="fIso" oninput="updateField('iso', this.value)" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent text-xs font-medium font-mono text-center outline-none focus:border-indigo-500 transition-colors" />
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5 pt-1">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400" for="fBrand">Manufacturer Signature Assignment</label>
+                        <select id="fBrand" onchange="updateBrand(this.value)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent text-xs font-semibold outline-none dark:bg-[#1e1e1e]">
+                            </select>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-[#1e1e1e] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+                    <h2 class="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800/60 pb-2">Layout Geometry</h2>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            <span>Matte Border Weight</span>
+                            <span id="marginLabel" class="text-indigo-500 font-bold">3.5%</span>
+                        </div>
+                        <input type="range" id="fMargin" min="1.5" max="10" step="0.1" value="3.5" oninput="updateMargin(this.value)" class="w-full h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+                    </div>
+
+                    <div class="flex justify-between items-center bg-slate-50 dark:bg-black/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/40">
+                        <label class="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 cursor-pointer select-none" for="fShowBar">Render Metadata Bar</label>
+                        <input type="checkbox" id="fShowBar" checked onchange="updateShowBar(this.checked)" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 scale-110 accent-indigo-500 cursor-pointer" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400">Export Encoding</label>
+                        <div class="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                            <button id="fmtPng" onclick="setFormat('png')" class="py-1.5 rounded-lg text-[10px] font-black transition-all bg-white dark:bg-slate-700 text-indigo-500 shadow-sm">PNG</button>
+                            <button id="fmtJpg" onclick="setFormat('jpeg')" class="py-1.5 rounded-lg text-[10px] font-black transition-all text-slate-400 dark:text-slate-500">JPEG</button>
+                        </div>
+                    </div>
+
+                    <button id="downloadBtn" onclick="downloadFramedImage()" class="w-full bg-[#262626] dark:bg-[#FDF5E6] text-white dark:text-[#262626] py-4 rounded-2xl font-black text-xs tracking-widest uppercase hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-md">
+                        <i data-lucide="download" class="w-4 h-4"></i> Export Framed Photo
+                    </button>
+                </div>
+
+                <div class="bg-white dark:bg-[#1e1e1e] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <details class="logos group">
+                        <summary class="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400 cursor-pointer select-none">
+                            <span>Asset Signature Vault</span>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 group-open:rotate-180 transition-transform"></i>
+                        </summary>
+                        <div class="pt-4 space-y-3">
+                            <p class="text-[10px] leading-relaxed text-slate-400 font-medium">
+                                Direct vector URLs are automatically queried from your hosted root directory's database template. You can override individual parameters with manual uploads below.
+                            </p>
+                            <div id="logoList" class="divide-y divide-slate-100 dark:divide-slate-800/60 pt-2">
+                                </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <div class="lg:col-span-7 flex flex-col justify-between bg-white dark:bg-[#1e1e1e] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div class="space-y-4">
+                    <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800/60 pb-2">Workspace Render Viewport</h3>
+                    <div class="flex items-center justify-center bg-slate-50 dark:bg-black/40 rounded-[1.5rem] p-6 min-h-[460px] border border-slate-100 dark:border-slate-900 overflow-hidden relative">
+                        <div class="max-w-full overflow-auto max-h-[600px] p-2 flex justify-center items-center">
+                            <canvas id="borderCanvas" class="max-w-full h-auto shadow-2xl transition-opacity duration-300 opacity-0 bg-white"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center pt-4">
+                    <p class="text-[10px] font-mono text-slate-400 mb-3">Viewport demonstrates display metrics. Final output retains original source dimension pixels.</p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="pt-16 pb-20 border-t border-slate-200 dark:border-slate-800">
+            <div class="flex flex-col items-center text-center space-y-8">
+                <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i> Local-Only Architecture
+                </div>
+                <div class="max-w-xl space-y-4">
+                    <h3 class="text-lg font-black italic tracking-tight uppercase">ImgFrame is built for privacy.</h3>
+                    <p class="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium">Your images are processed 100% in your browser. We have no servers, and no databases. Once the tab is closed, all pixel data is permanently purged from memory.</p>
+                </div>
+                <button onclick="purgeWorkspace()" class="group flex items-center gap-2 px-8 py-3 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-[10px] font-black tracking-widest uppercase hover:bg-rose-600 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-sm">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Reset Workspace
+                </button>
+                
+                <div class="space-y-2 border-t border-slate-200/60 dark:border-slate-800/60 pt-6 w-full max-w-sm">
+                    <span class="text-[10px] font-black tracking-widest uppercase text-slate-400 dark:text-slate-500 block">Other Projects</span>
+                    <a href="https://splttr.cc" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-300 shadow-sm hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors">
+                        Splttr.cc <i data-lucide="external-link" class="w-3 h-3 opacity-60"></i>
+                    </a>
+                </div>
+
+                <div class="text-[9px] text-slate-400 dark:text-slate-600 font-black tracking-[0.2em] uppercase">© 2026 // Zero Cookies // No Servers // Client-Side Magic</div>
+                <div class="text-[9px] text-slate-400 dark:text-slate-600 font-black tracking-[0.2em] uppercase">Made by Google Gemini, prompted by Ryan Veitch.</div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+    <script>
+        "use strict";
+
+        /* --- Global Architectural Definitions --- */
+        const BRANDS = [
+            {key:'canon',      label:'Canon',            match:['canon']},
+            {key:'nikon',      label:'Nikon',            match:['nikon']},
+            {key:'sony',       label:'Sony',             match:['sony']},
+            {key:'fujifilm',   label:'Fujifilm',         match:['fuji','fujifilm']},
+            {key:'panasonic',  label:'Panasonic Lumix',  match:['panasonic','lumix']},
+            {key:'olympus',    label:'Olympus',          match:['olympus']},
+            {key:'omsystem',   label:'OM System',        match:['om digital','om system','omds']},
+            {key:'leica',      label:'Leica',            match:['leica']},
+            {key:'pentax',     label:'Pentax',           match:['pentax']},
+            {key:'ricoh',      label:'Ricoh',            match:['ricoh']},
+            {key:'hasselblad', label:'Hasselblad',       match:['hasselblad']},
+            {key:'apple',      label:'Apple',            match:['apple']},
+            {key:'samsung',    label:'Samsung',          match:['samsung']},
+            {key:'dji',        label:'DJI',              match:['dji']}
+        ];
+
+        let state = {
+            imageSource: null,
+            fields: { camera: '', lens: '', shutter: '', aperture: '', iso: '' },
+            brandKey: '',
+            marginRatio: 0.035,
+            showInfoBar: true,
+            format: 'png'
+        };
+
+        let logoImgCache = {};
+
+        /* --- Local Storage Vault Controls --- */
+        const getVaultKey = (k) => `splttr_framer_vault_${k}`;
+        function loadVaultLogo(k) { try { return localStorage.getItem(getVaultKey(k)); } catch(e) { return null; } }
+        function saveVaultLogo(k, dUrl) { try { localStorage.setItem(getVaultKey(k), dUrl); return true; } catch(e) { return false; } }
+        function deleteVaultLogo(k) { try { localStorage.removeItem(getVaultKey(k)); } catch(e) {} }
+
+        /* --- Automated Dynamic CSV Pull Engine --- */
+        function loadCsvLogos() {
+            const csvFallbackData = `Manufacturer,LogoUrl
+Canon,https://upload.wikimedia.org/wikipedia/commons/8/8d/Canon_logo.svg
+Sony,https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg
+Nikon,https://upload.wikimedia.org/wikipedia/commons/f/f3/Nikon_Logo.svg
+Fujifilm,https://upload.wikimedia.org/wikipedia/commons/a/a1/Fujifilm_logo.svg
+Panasonic Lumix,https://upload.wikimedia.org/wikipedia/commons/3/3e/Lumix_logo.svg
+Olympus,https://upload.wikimedia.org/wikipedia/commons/2/2d/Olympus_Corporation_logo.svg
+OM System,https://upload.wikimedia.org/wikipedia/commons/b/bd/OMDS_OM-System-Logo.svg
+Leica,https://upload.wikimedia.org/wikipedia/commons/8/8e/Leica_Camera.svg
+Pentax,https://upload.wikimedia.org/wikipedia/commons/8/81/Pentax_Logo.svg
+Ricoh,https://upload.wikimedia.org/wikipedia/commons/2/2e/Ricoh_logo_2005.svg
+Hasselblad,https://upload.wikimedia.org/wikipedia/commons/e/ef/Hasselblad_Logo_2015.png
+Apple,https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg
+Samsung,https://upload.wikimedia.org/wikipedia/commons/b/b4/Samsung_wordmark.svg
+DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg`;
+
+            function parseAndRegisterCsv(text) {
+                let lines = text.split(/\r?\n/);
+                for (let i = 1; i < lines.length; i++) {
+                    let line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    let commaIdx = line.indexOf(',');
+                    if (commaIdx === -1) continue;
+                    
+                    let manufacturer = line.substring(0, commaIdx).trim();
+                    let logoUrl = line.substring(commaIdx + 1).trim();
+                    
+                    if (manufacturer.startsWith('"') && manufacturer.endsWith('"')) manufacturer = manufacturer.slice(1, -1).trim();
+                    if (logoUrl.startsWith('"') && logoUrl.endsWith('"')) logoUrl = logoUrl.slice(1, -1).trim();
+                    
+                    let lowerMfg = manufacturer.toLowerCase();
+                    let foundBrand = BRANDS.find(b => b.match.some(m => lowerMfg.includes(m) || m.includes(lowerMfg)));
+                    
+                    if (foundBrand) {
+                        foundBrand.logoUrl = logoUrl;
+                    } else {
+                        let cleanKey = manufacturer.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        if (cleanKey) {
+                            BRANDS.push({
+                                key: cleanKey,
+                                label: manufacturer,
+                                match: [manufacturer.toLowerCase()],
+                                logoUrl: logoUrl
+                            });
+                        }
+                    }
+                }
+                initBrandSelect();
+                drawLogoInterfaceRows();
+            }
+
+            fetch('CamLogo - Sheet1.csv')
+                .then(response => {
+                    if (!response.ok) throw new Error();
+                    return response.text();
+                })
+                .then(text => {
+                    parseAndRegisterCsv(text);
+                })
+                .catch(() => {
+                    console.log("file:// protocol detected or CSV missing. Using embedded fallback data.");
+                    parseAndRegisterCsv(csvFallbackData);
+                });
+        }
+
+        function getAssembledLogo(key) {
+            return new Promise((resolve) => {
+                if(!key) return resolve(null);
+                if(logoImgCache[key]) return resolve(logoImgCache[key]);
+                
+                let dUrl = loadVaultLogo(key);
+                if(dUrl) {
+                    let img = new Image();
+                    img.onload = () => { logoImgCache[key] = img; resolve(img); };
+                    img.onerror = () => resolve(null);
+                    img.src = dUrl;
+                    return;
+                }
+                
+                let brandObj = BRANDS.find(b => b.key === key);
+                if(brandObj && brandObj.logoUrl) {
+                    let img = new Image();
+                    img.crossOrigin = "anonymous"; 
+                    img.onload = () => { logoImgCache[key] = img; resolve(img); };
+                    img.onerror = () => {
+                        console.warn(`Could not cross-compile asset download: ${brandObj.logoUrl}`);
+                        resolve(null);
+                    };
+                    img.src = brandObj.logoUrl;
+                    return;
+                }
+                
+                resolve(null);
+            });
+        }
+
+        /* --- Theme Management Toggle Engine --- */
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('splttr-theme', isDark ? 'dark' : 'light');
+            updateThemeIcon();
+        }
+        function updateThemeIcon() {
+            const icon = document.getElementById('themeIcon');
+            if (icon) {
+                icon.setAttribute('data-lucide', document.documentElement.classList.contains('dark') ? 'sun' : 'moon');
+                lucide.createIcons();
+            }
+        }
+
+        /* --- Formatting Utilities --- */
+        function parseShutter(speed) {
+            if (!speed || isNaN(speed) || speed <= 0) return '';
+            if (speed >= 1) {
+                let r = Math.round(speed * 10) / 10;
+                return (r % 1 === 0 ? r.toFixed(0) : r.toFixed(1)) + 's';
+            }
+            return '1/' + Math.round(1 / speed) + 's';
+        }
+        function parseAperture(fNum) {
+            if (!fNum || isNaN(fNum)) return '';
+            let r = Math.round(fNum * 10) / 10;
+            return 'f/' + (r % 1 === 0 ? r.toFixed(0) : r.toFixed(1));
+        }
+        function resolveBrandKey(make) {
+            if (!make) return '';
+            let src = make.toLowerCase();
+            let found = BRANDS.find(b => b.match.some(m => src.includes(m)));
+            return found ? found.key : '';
+        }
+
+        /* --- Processing Pipeline Real-time Calculations --- */
+        function processRenderPipeline() {
+            if (!state.imageSource) return;
+            const canvas = document.getElementById('borderCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            const iw = state.imageSource.width;
+            const ih = state.imageSource.height;
+            const shortSide = Math.min(iw, ih);
+            
+            const edgePadding = Math.max(8, Math.round(shortSide * state.marginRatio));
+            const bottomBarHeight = state.showInfoBar ? Math.round(edgePadding * 4.4) : edgePadding;
+            
+            canvas.width = iw + (edgePadding * 2);
+            canvas.height = ih + edgePadding + bottomBarHeight;
+            
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(state.imageSource, edgePadding, edgePadding, iw, ih);
+            
+            if (!state.showInfoBar) {
+                canvas.style.opacity = 1;
+                return;
+            }
+
+            getAssembledLogo(state.brandKey).then(logoImg => {
+                let barTopY = edgePadding + ih;
+                let textLimitWidth = canvas.width * 0.65;
+                
+                let titleFontPx = Math.max(12, Math.round(bottomBarHeight * 0.26));
+                let subFontPx = Math.max(9, Math.round(bottomBarHeight * 0.16));
+                let spacingGap = Math.max(3, Math.round(bottomBarHeight * 0.07));
+                
+                let displayItems = [];
+                if (state.fields.camera) displayItems.push({ text: state.fields.camera, size: titleFontPx, weight: '600', color: '#111111' });
+                if (state.fields.lens) displayItems.push({ text: state.fields.lens, size: subFontPx, weight: '400', color: '#64748b' });
+                
+                let exposureStr = [state.fields.shutter, state.fields.aperture, state.fields.iso].filter(Boolean).join('   ·   ');
+                if (exposureStr) displayItems.push({ text: exposureStr, size: subFontPx, weight: '500', color: '#111111' });
+                if (!displayItems.length) displayItems.push({ text: 'No Capture Data Found', size: subFontPx, weight: '400', color: '#94a3b8' });
+
+                let internalHeight = displayItems.reduce((acc, item) => acc + item.size, 0) + (spacingGap * (displayItems.length - 1));
+                let cursorY = barTopY + ((bottomBarHeight - internalHeight) / 2);
+                
+                ctx.textBaseline = 'top';
+                ctx.textAlign = 'left';
+                
+                displayItems.forEach(item => {
+                    ctx.font = `${item.weight} ${item.size}px "Outfit", sans-serif`;
+                    ctx.fillStyle = item.color;
+                    ctx.fillText(item.text, edgePadding, cursorY, textLimitWidth);
+                    cursorY += item.size + spacingGap;
+                });
+
+                if (logoImg) {
+                    let maxSignatureHeight = bottomBarHeight * 0.44;
+                    let maxSignatureWidth = canvas.width * 0.28;
+                    let calculatedScale = Math.min(maxSignatureHeight / logoImg.height, maxSignatureWidth / logoImg.width);
+                    
+                    let sw = logoImg.width * calculatedScale;
+                    let sh = logoImg.height * calculatedScale;
+                    let sx = canvas.width - edgePadding - sw;
+                    let sy = barTopY + ((bottomBarHeight - sh) / 2);
+                    ctx.drawImage(logoImg, sx, sy, sw, sh);
+                } else if (state.brandKey) {
+                    ctx.font = `900 ${titleFontPx}px "Outfit", sans-serif`;
+                    ctx.fillStyle = '#111111';
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    let label = (BRANDS.find(b => b.key === state.brandKey)?.label || state.brandKey).toUpperCase();
+                    ctx.fillText(label, canvas.width - edgePadding, barTopY + (bottomBarHeight / 2));
+                }
+                
+                canvas.style.opacity = 1;
+            });
+        }
+
+        /* --- Interface Data Input Actions --- */
+        function handleFileChange(element) {
+            let file = element.files && element.files[0];
+            if (!file) return;
+            
+            const msgNode = document.getElementById('statusMessage');
+            msgNode.textContent = "Analyzing structure & processing Exif arrays...";
+            
+            Promise.all([
+                exifr.parse(file, { tiff: true, exif: true }).catch(() => ({})),
+                new Promise((resolve, reject) => {
+                    let r = new FileReader();
+                    r.onload = (e) => {
+                        let img = new Image();
+                        img.onload = () => resolve(img);
+                        img.onerror = reject;
+                        img.src = e.target.result;
+                    };
+                    r.onerror = reject;
+                    r.readAsDataURL(file);
+                })
+            ]).then(([exif, img]) => {
+                state.imageSource = img;
+                msgNode.textContent = "";
+                
+                let rawMake = (exif.Make || '').toString().trim();
+                let rawModel = (exif.Model || '').toString().trim();
+                let fullModel = (rawModel.toLowerCase().startsWith(rawMake.toLowerCase())) ? rawModel : `${rawMake} ${rawModel}`;
+                
+                state.fields.camera = fullModel.trim();
+                state.fields.lens = (exif.LensModel || exif.LensInfo || '').toString().trim();
+                state.fields.shutter = parseShutter(exif.ExposureTime);
+                state.fields.aperture = parseAperture(exif.FNumber);
+                state.fields.iso = exif.ISO ? `ISO ${exif.ISO}` : '';
+                state.brandKey = resolveBrandKey(rawMake);
+                
+                populateFormElements();
+                document.getElementById('workspaceArea').classList.remove('hidden-tool');
+                processRenderPipeline();
+            }).catch(err => {
+                console.error(err);
+                msgNode.textContent = "Error parsing file format pipeline layout configuration.";
+            });
+        }
+
+        function populateFormElements() {
+            document.getElementById('fCamera').value = state.fields.camera;
+            document.getElementById('fLens').value = state.fields.lens;
+            document.getElementById('fShutter').value = state.fields.shutter;
+            document.getElementById('fAperture').value = state.fields.aperture;
+            document.getElementById('fIso').value = state.fields.iso;
+            document.getElementById('fBrand').value = state.brandKey;
+        }
+
+        function updateField(key, val) {
+            state.fields[key] = val;
+            processRenderPipeline();
+        }
+
+        function updateBrand(val) {
+            state.brandKey = val;
+            processRenderPipeline();
+        }
+
+        function updateMargin(val) {
+            state.marginRatio = parseFloat(val) / 100;
+            document.getElementById('marginLabel').textContent = val + '%';
+            processRenderPipeline();
+        }
+
+        function updateShowBar(val) {
+            state.showInfoBar = val;
+            processRenderPipeline();
+        }
+
+        function setFormat(fmt) {
+            state.format = fmt;
+            document.getElementById('fmtPng').className = fmt === 'png' ? "py-1.5 rounded-lg text-[10px] font-black transition-all bg-white dark:bg-slate-700 text-indigo-500 shadow-sm" : "py-1.5 rounded-lg text-[10px] font-black transition-all text-slate-400 dark:text-slate-500";
+            document.getElementById('fmtJpg').className = fmt === 'jpeg' ? "py-1.5 rounded-lg text-[10px] font-black transition-all bg-white dark:bg-slate-700 text-indigo-500 shadow-sm" : "py-1.5 rounded-lg text-[10px] font-black transition-all text-slate-400 dark:text-slate-500";
+        }
+
+        function downloadFramedImage() {
+            if(!state.imageSource) return;
+            const canvas = document.getElementById('borderCanvas');
+            let mime = state.format === 'jpeg' ? 'image/jpeg' : 'image/png';
+            let quality = state.format === 'jpeg' ? 0.96 : undefined;
+            
+            let anchor = document.createElement('a');
+            anchor.download = `framed_capture.${state.format === 'jpeg' ? 'jpg' : 'png'}`;
+            anchor.href = canvas.toDataURL(mime, quality);
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+        }
+
+        /* --- Dynamic Interactive Logo Management --- */
+        function initBrandSelect() {
+            let select = document.getElementById('fBrand');
+            select.innerHTML = '<option value="">— Text Engine Text Only —</option>';
+            BRANDS.forEach(b => {
+                let opt = document.createElement('option');
+                opt.value = b.key;
+                opt.textContent = b.label;
+                select.appendChild(opt);
+            });
+            if (state.brandKey) select.value = state.brandKey;
+        }
+
+        function drawLogoInterfaceRows() {
+            let list = document.getElementById('logoList');
+            list.innerHTML = '';
+            BRANDS.forEach(b => {
+                let hasStored = loadVaultLogo(b.key);
+                let fallbackUrl = b.logoUrl || null;
+                
+                let container = document.createElement('div');
+                container.className = "flex items-center justify-between py-2.5 text-xs";
+                
+                let metaBlock = document.createElement('div');
+                metaBlock.className = "flex items-center gap-3";
+                
+                let visualPreview = document.createElement('div');
+                visualPreview.className = "w-7 h-7 rounded border border-slate-200 dark:border-slate-800 bg-white flex items-center justify-center overflow-hidden flex-shrink-0";
+                if(hasStored) {
+                    let thumb = document.createElement('img');
+                    thumb.src = hasStored;
+                    thumb.className = "max-w-full max-h-full object-contain";
+                    visualPreview.appendChild(thumb);
+                } else if(fallbackUrl) {
+                    let thumb = document.createElement('img');
+                    thumb.src = fallbackUrl;
+                    thumb.className = "max-w-full max-h-full object-contain";
+                    visualPreview.appendChild(thumb);
+                } else {
+                    visualPreview.innerHTML = '<span class="text-[9px] text-slate-300 font-bold">TXT</span>';
+                }
+
+                let labelSpan = document.createElement('span');
+                labelSpan.className = "font-semibold text-slate-600 dark:text-slate-300 text-[11px]";
+                labelSpan.textContent = b.label;
+                
+                if (fallbackUrl && !hasStored) {
+                    labelSpan.innerHTML += ' <span class="text-[9px] font-mono text-emerald-500 dark:text-emerald-400 opacity-80">(Auto)</span>';
+                }
+
+                metaBlock.appendChild(visualPreview);
+                metaBlock.appendChild(labelSpan);
+
+                let actionBlock = document.createElement('div');
+                actionBlock.className = "flex items-center gap-2";
+
+                let actionBtn = document.createElement('button');
+                actionBtn.className = "text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-500";
+                actionBtn.textContent = hasStored ? "Replace" : (fallbackUrl ? "Override" : "Add Asset");
+                
+                let hiddenInput = document.createElement('input');
+                hiddenInput.type = "file";
+                hiddenInput.accept = "image/*";
+                hiddenInput.className = "hidden";
+                
+                actionBtn.onclick = () => hiddenInput.click();
+                hiddenInput.onchange = () => {
+                    let f = hiddenInput.files && hiddenInput.files[0];
+                    if(!f) return;
+                    let reader = new FileReader();
+                    reader.onload = (ev) => {
+                        let tempImg = new Image();
+                        tempImg.onload = () => {
+                            let mx = 400;
+                            let scl = Math.min(1, mx / Math.max(tempImg.width, tempImg.height));
+                            let tc = document.createElement('canvas');
+                            tc.width = Math.round(tempImg.width * scl);
+                            tc.height = Math.round(tempImg.height * scl);
+                            let tcx = tc.getContext('2d');
+                            tcx.drawImage(tempImg, 0, 0, tc.width, tc.height);
+                            
+                            saveVaultLogo(b.key, tc.toDataURL('image/png'));
+                            delete logoImgCache[b.key];
+                            drawLogoInterfaceRows();
+                            processRenderPipeline();
+                        };
+                        tempImg.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(f);
+                };
+
+                actionBlock.appendChild(actionBtn);
+                actionBlock.appendChild(hiddenInput);
+
+                if(hasStored) {
+                    let delBtn = document.createElement('button');
+                    delBtn.className = "text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border border-rose-200/60 dark:border-rose-950 bg-rose-50/40 dark:bg-rose-950/20 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors";
+                    delBtn.textContent = "Clear";
+                    delBtn.onclick = () => {
+                        deleteVaultLogo(b.key);
+                        delete logoImgCache[b.key];
+                        drawLogoInterfaceRows();
+                        processRenderPipeline();
+                    };
+                    actionBlock.appendChild(delBtn);
+                }
+
+                container.appendChild(metaBlock);
+                container.appendChild(actionBlock);
+                list.appendChild(container);
+            });
+        }
+
+        /* --- Clear-Down Execution Space --- */
+        function purgeWorkspace() {
+            if(!confirm("Purge memory buffers and reset image parameters?")) return;
+            state.imageSource = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('workspaceArea').classList.add('hidden-tool');
+            document.getElementById('borderCanvas').style.opacity = 0;
+            document.getElementById('statusMessage').textContent = "";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        /* --- Boot Orchestration --- */
+        window.addEventListener('DOMContentLoaded', () => {
+            updateThemeIcon();
+            initBrandSelect();
+            drawLogoInterfaceRows();
+            loadCsvLogos();
+        });
+    </script>
+</body>
+</html>
