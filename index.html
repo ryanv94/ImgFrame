@@ -38,7 +38,7 @@
         :root { --accent: #9f7971; --gold: #d4af37; }
         body { letter-spacing: -0.01em; }
         .logo-font { font-family: 'Playfair Display', serif; background: linear-gradient(to right, var(--accent), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .custom-shadow { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+        .custom-shadow = { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
         .hidden-tool { display: none !important; }
         
         /* Custom styled Range Input to match splttr */
@@ -163,7 +163,8 @@
                     <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800/60 pb-2">Workspace Render Viewport</h3>
                     <div class="flex items-center justify-center bg-slate-50 dark:bg-black/40 rounded-[1.5rem] p-6 min-h-[460px] border border-slate-100 dark:border-slate-900 overflow-hidden relative">
                         <div class="max-w-full overflow-auto max-h-[600px] p-2 flex justify-center items-center">
-                            <canvas id="borderCanvas" class="max-w-full h-auto shadow-2xl transition-opacity duration-300 opacity-0 bg-white"></canvas>
+                            <canvas id="borderCanvas" class="hidden"></canvas>
+                            <img id="outputImage" class="max-w-full h-auto shadow-2xl transition-opacity duration-300 opacity-0 bg-white select-all" alt="Framed layout viewport preview" />
                         </div>
                     </div>
                 </div>
@@ -372,6 +373,19 @@ DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg
             return found ? found.key : '';
         }
 
+        /* --- Update Interactive Viewport Image Element --- */
+        function updateOutputImage() {
+            const canvas = document.getElementById('borderCanvas');
+            const img = document.getElementById('outputImage');
+            if (!canvas || !img) return;
+            
+            let mime = state.format === 'jpeg' ? 'image/jpeg' : 'image/png';
+            let quality = state.format === 'jpeg' ? 0.96 : undefined;
+            
+            img.src = canvas.toDataURL(mime, quality);
+            img.style.opacity = 1;
+        }
+
         /* --- Processing Pipeline Real-time Calculations --- */
         function processRenderPipeline() {
             if (!state.imageSource) return;
@@ -393,7 +407,7 @@ DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg
             ctx.drawImage(state.imageSource, edgePadding, edgePadding, iw, ih);
             
             if (!state.showInfoBar) {
-                canvas.style.opacity = 1;
+                updateOutputImage();
                 return;
             }
 
@@ -445,7 +459,7 @@ DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg
                     ctx.fillText(label, canvas.width - edgePadding, barTopY + (bottomBarHeight / 2));
                 }
                 
-                canvas.style.opacity = 1;
+                updateOutputImage();
             });
         }
 
@@ -528,6 +542,7 @@ DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg
             state.format = fmt;
             document.getElementById('fmtPng').className = fmt === 'png' ? "py-1.5 rounded-lg text-[10px] font-black transition-all bg-white dark:bg-slate-700 text-indigo-500 shadow-sm" : "py-1.5 rounded-lg text-[10px] font-black transition-all text-slate-400 dark:text-slate-500";
             document.getElementById('fmtJpg').className = fmt === 'jpeg' ? "py-1.5 rounded-lg text-[10px] font-black transition-all bg-white dark:bg-slate-700 text-indigo-500 shadow-sm" : "py-1.5 rounded-lg text-[10px] font-black transition-all text-slate-400 dark:text-slate-500";
+            processRenderPipeline();
         }
 
         function downloadFramedImage() {
@@ -663,7 +678,13 @@ DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg
             state.imageSource = null;
             document.getElementById('imageInput').value = '';
             document.getElementById('workspaceArea').classList.add('hidden-tool');
-            document.getElementById('borderCanvas').style.opacity = 0;
+            
+            const img = document.getElementById('outputImage');
+            if (img) {
+                img.src = '';
+                img.style.opacity = 0;
+            }
+            
             document.getElementById('statusMessage').textContent = "";
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
