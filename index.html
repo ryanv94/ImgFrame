@@ -402,8 +402,19 @@ DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg
             const canvas = document.getElementById('borderCanvas');
             const ctx = canvas.getContext('2d');
             
-            const iw = state.imageSource.width;
-            const ih = state.imageSource.height;
+            // 1. Hardware Safety Threshold (Cures mobile/iOS canvas crashes)
+            const MAX_HARDWARE_DIMENSION = 4096; 
+            let rawW = state.imageSource.width;
+            let rawH = state.imageSource.height;
+            
+            let scaleFactor = 1;
+            if (Math.max(rawW, rawH) > MAX_HARDWARE_DIMENSION) {
+                scaleFactor = MAX_HARDWARE_DIMENSION / Math.max(rawW, rawH);
+            }
+            
+            // Proportional target dimensions well within system limits
+            const iw = Math.round(rawW * scaleFactor);
+            const ih = Math.round(rawH * scaleFactor);
             const shortSide = Math.min(iw, ih);
             
             const edgePadding = Math.max(8, Math.round(shortSide * state.marginRatio));
@@ -412,12 +423,17 @@ DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg
             canvas.width = iw + (edgePadding * 2);
             canvas.height = ih + edgePadding + bottomBarHeight;
             
+            // Force high-fidelity asset rendering context attributes
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Build absolute core white matte background
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(state.imageSource, edgePadding, edgePadding, iw, ih);
             
             if (!state.showInfoBar) {
-                updateOutputImage();
+                canvas.style.opacity = 1;
                 return;
             }
 
@@ -469,7 +485,7 @@ DJI,https://upload.wikimedia.org/wikipedia/commons/9/9a/DJI_Innovations_logo.svg
                     ctx.fillText(label, canvas.width - edgePadding, barTopY + (bottomBarHeight / 2));
                 }
                 
-                updateOutputImage();
+                canvas.style.opacity = 1;
             });
         }
 
